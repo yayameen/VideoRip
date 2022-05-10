@@ -179,7 +179,7 @@ IF NOT EXIST !discInfoFile! (
 	IF NOT "!lastLine!"=="!drvVol!" (
 		SET "forceRip=TRUE"
 		ECHO !drvVol!> "!volNameFile!"
-		"C:\Program Files (x86)\MakeMKV\makemkvcon.exe" -r info disc:%discNum% > !discInfoFile!
+		"%ProgramFiles(x86)%\MakeMKV\makemkvcon.exe" -r info disc:%discNum% > !discInfoFile!
 	)
 )
 
@@ -1171,13 +1171,13 @@ FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 	SET "MakeMKVDir=MakeMKV"
 	REM IF !discType!==DVD (
 	REM 	IF !mediaType!==FILM (
-	REM		IF EXISTS "C:\Program Files (x86)\MakeMKV110\makemkvcon.exe" (
+	REM		IF EXISTS "%ProgramFiles(x86)%\MakeMKV110\makemkvcon.exe" (
 	REM			SET "MakeMKVDir=MakeMKV110"
 	REM		)
 	REM	)
 	REM )
 	IF !ripCount! GEQ !Filesx! (
-		START "" /MIN /BELOWNORMAL "C:\Program Files (x86)\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% %%i !tempVidDir!
+		START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% %%i !tempVidDir!
 		
 		CALL :waiting 3
 		IF ERRORLEVEL 1       (
@@ -1347,7 +1347,7 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 	)
 	
 	IF !videoIsConverted!==FALSE (
-		START "" /MIN /BELOWNORMAL cmd /c ""C:\program files\HandBrake\HandBrakeCLI.exe" --preset-import-file "!preset!.json" -Z "%preset%" -i "!tempVidDir!%%i" -o "!tempConvertDir!%%i"" ^> !progressFile!
+		START "" /MIN /BELOWNORMAL cmd /c ""%ProgramFiles%\HandBrake\HandBrakeCLI.exe" --preset-import-file "!preset!.json" -Z "%preset%" -i "!tempVidDir!%%i" -o "!tempConvertDir!%%i"" ^> !progressFile!
 		CALL :waiting 3
 		CALL :waitingForHB
 	
@@ -1427,8 +1427,8 @@ IF !convertSuccess! == TRUE (
 )
 
 
-REM Send Text Message Notification ======================================
-REM blat3219\blat.exe -to 2519791155@txt.att.net -subject "!ConversionResult! for %showDir%" -body "Conversion %ConversionResult% for %vol%"
+REM Send Notification ======================================
+REM blat3219\blat.exe -to myemail@wherever.com -subject "!ConversionResult! for %showDir%" -body "Conversion %ConversionResult% for %vol%"
 Echo  
 
 ECHO 100 > !ripProgressFile!
