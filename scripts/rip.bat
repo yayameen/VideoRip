@@ -1347,7 +1347,7 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 	)
 	
 	IF !videoIsConverted!==FALSE (
-		START "" /MIN /BELOWNORMAL cmd /c ""%ProgramFiles%\HandBrake\HandBrakeCLI.exe" --preset-import-file "!preset!.json" -Z "%preset%" -i "!tempVidDir!%%i" -o "!tempConvertDir!%%i"" ^> !progressFile!
+		START "" /MIN /BELOWNORMAL cmd /c ""C:\Program Files\HandBrake\HandBrakeCLI.exe" --preset-import-file "!preset!.json" -Z "%preset%" -i "!tempVidDir!%%i" -o "!tempConvertDir!%%i"" ^> !progressFile!
 		CALL :waiting 3
 		CALL :waitingForHB
 	
@@ -1418,7 +1418,8 @@ IF !convertSuccess! == TRUE (
    )
 	REM Eject Disc if successful ===========================================
    ECHO Ejecting Disc !drive! >> !statusFile!
-   powershell "(new-object -COM Shell.Application).NameSpace(17).ParseName('!drive!:').InvokeVerb('Eject')"
+   CALL :waiting 1
+   powershell "$obj = (new-object -COM Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')"
 
 ) ELSE (
    SET ConversionResult=failed
@@ -1612,24 +1613,6 @@ CALL :writeLog ]
 SET progressNum=0
 
 :waitForHBProgress
-IF !progressNum! LSS 90 (
-	CALL :getLastEntry !progressFile!
-	IF "!lastLine:ETA=!" == "!lastLine!" (
-		SET /A "progressNum+=5"
-		IF !progressNum! LSS 40 (
-			REM Wait for ETA
-			CALL :waiting 5
-			GOTO :waitForHBProgress
-		) ELSE (
-			ECHO 
-		)
-	) ELSE (
-		REM print ETA from end of progress
-		SET "currentETA="
-		SET "currentETA=!lastLine:~-14!"
-		ECHO !currentETA!>> !statusFile!
-	)
-)
 
 REM reset variables
 CALL :logChar [
@@ -1637,6 +1620,7 @@ SET "progressNum=0"
 SET "progressChar=#"
 SET "currentProgress=0"
 SET "whileLoopDone=0"
+SET "currentETA="
 
 REM Check to see if HandBrake finished
 :readHBprogress
@@ -1664,6 +1648,13 @@ IF !taskIsRunning! EQU FALSE (
 			SET "currentProgress=!currentProgress:.=!"
 			SET "currentProgress=!currentProgress:,=!"
 			SET "currentProgress=!currentProgress: =!"
+		)
+		IF "!currentETA!" == "" (
+			IF NOT "!lastLine:ETA=!" == "!lastLine!" (		
+				REM print ETA from end of progress
+				SET "currentETA=!lastLine:~-14!"
+				ECHO !currentETA!>> !statusFile!
+			)
 		)
 	)
 )
