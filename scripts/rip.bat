@@ -49,6 +49,12 @@ IF "!keepAngles!" EQU "" (
    SET keepAngles=FALSE
 )
 
+IF "!preset!" EQU "" (
+   ECHO No preset specified >>!logFile!
+) ELSE (
+   ECHO preset is !preset! >>!logFile!
+)
+
 cd %workingDir%
 ECHO 0 > !ripProgressFile!
 
@@ -86,7 +92,7 @@ IF "!launchTail!"=="TRUE" (
 )
 
 IF NOT EXIST !tempVidDir! (
-   SET tempVidDrive=!tempVidDir:~3!
+   SET tempVidDrive=!tempVidDir:~2!
 	IF NOT EXIST !tempVidDrive! (
 	   CALL :writeAndLog Ripping Hard Drive Not Found
 	) ELSE (
@@ -96,7 +102,7 @@ IF NOT EXIST !tempVidDir! (
 )
 
 IF NOT EXIST !tempConvertDir! (
-   SET tempConvertDrive=!tempConvertDir:~3!
+   SET tempConvertDrive=!tempConvertDir:~2!
 	IF NOT EXIST !tempConvertDrive! (
 	   CALL :writeAndLog Video Hard Drive Not Found
 	) ELSE (
@@ -115,8 +121,8 @@ REM Get optical drives ==================================================
 FOR /f "skip=1 tokens=1,2" %%i IN ('wmic logicaldisk get caption^, drivetype') DO (
    IF [%%j]==[5] (
 	   IF EXIST %%i\VIDEO_TS\ (
-			IF "!preset!" EQU "" (
-             SET preset=DVD
+			IF "!preset!" == "" (
+                      SET preset=DVD
 			)
          SET drive=%%i
 			SET drive=!drive::=!
@@ -125,7 +131,7 @@ FOR /f "skip=1 tokens=1,2" %%i IN ('wmic logicaldisk get caption^, drivetype') D
 			GOTO dvdInfo
 		)
 		IF EXIST %%i\BDMV\ (
-		   IF "!preset!" EQU "" (
+		   IF "!preset!" == "" (
              SET preset=BluRay720
 			)
          SET drive=%%i
@@ -163,6 +169,7 @@ IF 1 == 2 (
 
 REM set drive and read volume info ======================================
 :volInfo
+CALL :writeAndLog "Using Preset !preset!"
 ECHO Reading info for !drive! >>!logFile!
 FOR /F "tokens=1-5*" %%1 IN ('vol !drive!:') DO (
     SET "drvVol=%%6"
@@ -856,14 +863,23 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 						IF !minutesLength! == 60 (
 							SET "minutesLength=00"
 						)
-						SET "subLength=!currentTitleLength:~0,2!!minutesLength!:"
+						IF !minutesLength! LSS 10 (
+						    SET "subLength=!currentTitleLength:~0,2!0!minutesLength!"
+						) ELSE (
+						    SET "subLength=!currentTitleLength:~0,2!!minutesLength!"
+						)
 						IF "!userLength!" == "!subLength!" (
 							CALL :writeLog "Found title that rounded up to user length !subLength!" 
 							SET foundTitle=TRUE
 						) ELSE (
-							SET foundTitle=FALSE
-							SET badTitle=%%A
-							CALL :writeLog "    Title does not match user length !subLength!" 
+						      IF NOT !takeFirstTitle! == TRUE (
+								SET foundTitle=FALSE
+								SET badTitle=%%A
+								CALL :writeLog "    Title does not match user length !subLength!"
+							) ELSE (
+								CALL :writeLog "    Using first title even though title does not match user length"
+								SET foundTitle=TRUE
+							)
 						)
 					)
 				) ELSE (
@@ -1071,7 +1087,10 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		REM See if this title was marked to be skipped "bad"
 		IF !badTitle! NEQ %%A (
 			REM save the output name in order to rename this file
-		   ECHO !outputName!#!titleName!>> !renameFile!
+			REM quotes screw up rename
+			set safeRename=!titleName:"=?!
+			set safeRename=!safeRename:'=?!
+		   ECHO !outputName!#!safeRename!>> !renameFile!
 			
 			REM remember the last filename to detect multiple angles
 			IF "!discType!" == "Blu-Ray" (
@@ -1097,7 +1116,7 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 
 REM If we didn't find the movie's title, take the first one.
 ECHO    Check if we found the movie title >> !logFile!
-IF !mediaType! EQU FILM (
+IF !mediaType!==FILM (
    IF !isBonusDisc! EQU FALSE (
       IF !foundMainTitle! EQU FALSE (
 	      IF !takeFirstTitle! EQU FALSE (
@@ -1419,7 +1438,7 @@ IF !convertSuccess! == TRUE (
 	REM Eject Disc if successful ===========================================
    ECHO Ejecting Disc !drive! >> !statusFile!
    CALL :waiting 1
-   powershell "$obj = (new-object -COM Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')"
+   powershell.exe -Command "& {$obj = (new-object -comObject Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')}"
 
 ) ELSE (
    SET ConversionResult=failed
@@ -1625,15 +1644,30 @@ SET "currentETA="
 REM Check to see if HandBrake finished
 :readHBprogress
 CALL :taskRunning HandBrakeCLI.exe
-IF !taskIsRunning! EQU FALSE (
-	SET "whileLoopDone=1"
-	SET "currentProgress=100"
-) ELSE (
-	REM Get Progress
-	FIND "task 2" "!progressFile!" >"!tempFile!"
-	CALL :getLastEntry !progressFile!
-	IF NOT "!lastLine!" == "" (
-		SET "currentProgress=!lastLine:~23,3!"
+IF NOT !taskIsRunning! EQU FALSE (
+	IF "!currentETA!" == ""  (
+            REM Get Progress
+		CALL :getLastEntry !progressFile!
+		IF NOT "!lastLine!" == "" (
+			IF NOT "!lastLine:ETA=!" == "!lastLine!" (		
+				REM print ETA from end of progress
+				SET "currentETA=!lastLine:~-14!"
+				ECHO !currentETA!>> !statusFile!
+			)
+		)
+	)
+      CALL :waiting 10
+	GOTO :readHBprogress
+)
+
+CALL :writeLog ]
+
+:handBrakeExit
+EXIT /B
+
+REM readHandBrake Progress #################################################################
+REM ########################################################################################
+SET "currentProgress=!lastLine:~23,3!"
 		IF NOT "!currentProgress!" == "" (
 			SET "currentProgress=!currentProgress:.9=!"
 			SET "currentProgress=!currentProgress:.8=!"
@@ -1649,29 +1683,14 @@ IF !taskIsRunning! EQU FALSE (
 			SET "currentProgress=!currentProgress:,=!"
 			SET "currentProgress=!currentProgress: =!"
 		)
-		IF "!currentETA!" == "" (
-			IF NOT "!lastLine:ETA=!" == "!lastLine!" (		
-				REM print ETA from end of progress
-				SET "currentETA=!lastLine:~-14!"
-				ECHO !currentETA!>> !statusFile!
-			)
-		)
-	)
-)
+
 REM Draw progress bar
 IF NOT "!currentProgress!" == "" (
 	CALL :drawProgress !currentProgress! 4 100
 )
 
-REM Exit if HandBrake is done
-IF !whileLoopDone! NEQ 1 (
-	CALL :waiting 10
-	GOTO :readHBprogress
-)
-CALL :writeLog ]
-
-:handBrakeExit
 EXIT /B
+
 
 REM readEpisodeDetails #####################################################################
 REM ########################################################################################
