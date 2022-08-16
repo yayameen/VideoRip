@@ -945,13 +945,16 @@ namespace VideoRip
                     case "SD":
                         if (comboRepair.SelectedIndex == 1)
                             Model.EncodeSetting = "Repair";
-                        if (comboRepair.SelectedIndex == 2)
+                        else if (comboRepair.SelectedIndex == 2)
                             Model.EncodeSetting = "Restore";
                         else
                             Model.EncodeSetting = "DVD";
                         break;
                     case "HD":
-                        Model.EncodeSetting = "BluRay720";
+                        if (comboRepair.SelectedIndex > 0)
+                            Model.EncodeSetting = "Repair720";
+                        else
+                            Model.EncodeSetting = "BluRay720";
                         break;
                     case "HDX":
                         Model.EncodeSetting = "BluRay1080";
@@ -960,7 +963,12 @@ namespace VideoRip
                         Model.EncodeSetting = "BluRay4K";
                         break;
                     default:
-                        Model.EncodeSetting = string.Empty;
+                        if (comboRepair.SelectedIndex == 1)
+                            Model.EncodeSetting = "Repair";
+                        else if (comboRepair.SelectedIndex == 2)
+                            Model.EncodeSetting = "Restore";
+                        else
+                            Model.EncodeSetting = string.Empty;
                         break;
                 }
             }
