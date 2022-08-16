@@ -140,7 +140,9 @@ Video details are parsed from the title info extracted by MakeMKV. The codes use
 
 Avoiding Duplicate Videos
 ------------------------------
+````
 TINFO:xx,26,0
+````
 Blue-ray discs have unique segment numbers, so the segments that
 have been found are recorded in the titleSegmentList variables.
 DVD segments are not unique. The string "2ts" is used to detect
@@ -151,14 +153,18 @@ segments and is usually more desirable than the transport stream.
 
 Ordering Episodes
 ------------------------------
+````
 TINFO:xx,27,0
+````
 Blu-ray discs have title names. These names are used for getting TV
 episodes in the correct order. For DVDs the output filename must be
 used. This is less reliable.
 
 Skip short videos
 -----------------------------
+````
 TINFO:xx,9,0
+````
 If he title length is less than 28 seconds, it is ignored. MakeMKV
 has a miminmum title length setting which will filter out videos
 before VideoRip even sees them, so set MakeMKV preferences 
@@ -166,7 +172,9 @@ appropriately.
 
 Determine TV episode length
 -----------------------------
+````
 TINFO:xx,9,0
+````
 If the episode length isn't set, VideoRip assumes the first video
 it finds is an episode, and uses it to determine episode lengths.
 This is just a guess, so it is better to set the length yourself.
@@ -178,11 +186,14 @@ TV episode characteristics are recorded in order to identify other
 episodes on the disc. 99% of the time, episodes will match in every
 regard.
 
-SINFO:xx,0,19,0      The video dimension size
+````
+SINFO:xx,0,19,0     The video dimension size
 SINFO:%1,0,20,0      The video aspect ratio
 SINFO:%1,0,21,0      The video frame rate
 
 SINFO:xx,aa,3,0,     Audio stream languages are summed
+````
+
 
 Set valid episode length range
 ----------------------------
@@ -231,7 +242,9 @@ the main title usually has that many chapters.
 
 Video Aspect
 ---------------------------------
+````
 SINFO:xx,0,20
+````
 If VideoRip finds multiple possible main titles, it will prefer wide
 screen ratios over full screen.
 
