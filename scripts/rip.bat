@@ -547,14 +547,14 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		REM Get filename for episode ordering
 		CALL :writeLog "   Get filename for episode ordering"
 		FOR /f "delims=" %%x IN (!tempFile!) DO SET titleName=%%x
-      SET "titleName=!titleName:~13,-1!"
-      SET "titleName=!titleName:,=!"
-      SET "titleName=!titleName:"=!"
+      	SET "titleName=!titleName:~13,-1!"
+      	SET "titleName=!titleName:,=!"
+      	SET "titleName=!titleName:"=!"
 		SET "titleName=!titleName:"=!"
-      SET "titleName=!titleName: =!"
-      SET "titleName=!titleName:	=!"
-	   SET "titleName=!titleName:.mpls=.mkv!"
-      SET "titleName=!titleName:.m2ts=ts.mkv!"
+      	SET "titleName=!titleName: =!"
+      	SET "titleName=!titleName:	=!"
+	   	SET "titleName=!titleName:.mpls=.mkv!"
+      	SET "titleName=!titleName:.m2ts=ts.mkv!"
 		
    )
 	
@@ -563,10 +563,16 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 	FIND "TINFO:%%A,27,0" !discInfoFile! > "!tempFile!"
 	IF !ERRORLEVEL! EQU 0 (
 	    FOR /f "delims=" %%x IN (!tempFile!) DO SET outputName=%%x
-       SET "outputName=!outputName:~13,-1!"
-       SET "outputName=!outputName:,=!"
-       SET "outputName=!outputName:"=!"
-	    SET "outputName=!outputName:"=!"
+       	SET "outputName=!outputName:~13,-1!"
+		SET "outputName=!outputName:"=!"
+	 	SET "outputName=!outputName:"=!"
+
+		REM Remove leading comma
+		SET "tempChar=!outputName:~0,1!"
+		IF "!tempChar!"=="," (
+			SET "outputName=!outputName:~1!
+		)
+		ECHO Output name = !outputName! >> !logFile!    
 	) ELSE (
 	    CALL :writeAndLog "Could not find title output name."
 	)	
@@ -1087,10 +1093,8 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		REM See if this title was marked to be skipped "bad"
 		IF !badTitle! NEQ %%A (
 			REM save the output name in order to rename this file
-			REM quotes screw up rename
-			set safeRename=!titleName:"=?!
-			set safeRename=!safeRename:'=?!
-		   ECHO !outputName!#!safeRename!>> !renameFile!
+			
+		   ECHO !outputName!#!titleName!>> !renameFile!
 			
 			REM remember the last filename to detect multiple angles
 			IF "!discType!" == "Blu-Ray" (
@@ -1227,10 +1231,21 @@ FOR /f "delims=" %%w in (!renameFile!) DO (
    SET "newName=!newName:(=!"
 	SET "newName=!newName:)=!"
 	SET newName=!newName:#=" "!
-        ECHO: ren "!tempVidDir!!newName!" >> !logFile!
+
+	REM quotes screw up rename
+	SET "newName=!newName:'=?!"
+	SET "newName=!newName:,=?!"
+      ECHO: ren "!tempVidDir!!newName!" >> !logFile!
 	ren "!tempVidDir!!newName!"
+	IF NOT !ERRORLEVEL! EQU 0 (
+		ECHO RENAMING FAILURE >> !statusFile!
+		GOTO :eof
+	)
 )
 CALL :waiting 1
+
+REM Converting titles ====================================================
+:converting
 
 SET plusTime=%TIME:~3,2%
 SET plusTime=%plusTime: =0%
@@ -1266,11 +1281,15 @@ FOR /F "delims=|" %%i in ('dir /b /O:N !tempVidDir!*.mkv*') DO (
 	   SET /A BonusIndex+=1
 		REM name bonus material as extras
 		IF !mediaType!==TV (
-		    ECHO %%i to "!vol!!sep!!BonusIndex! - !plusTime! Extra.mkv">> !logFile!
-          ren "!tempVidDir!%%i" "!vol!!sep!!BonusIndex! - !plusTime! Extra.mkv"
+			IF NOT EXIST "!vol!!sep!!BonusIndex! - !plusTime! Extra.mkv" (
+		      	ECHO %%i to "!vol!!sep!!BonusIndex! - !plusTime! Extra.mkv">> !logFile!
+          			ren "!tempVidDir!%%i" "!vol!!sep!!BonusIndex! - !plusTime! Extra.mkv"
+			)
 		) ELSE (
-		    ECHO %%i to "!vol! - !BonusIndex! - !plusTime! Extra.mkv">> !logFile!
-          ren "!tempVidDir!%%i" "!vol! - !BonusIndex! - !plusTime! Extra.mkv"
+			IF NOT EXIST "!vol! - !BonusIndex! - !plusTime! Extra.mkv" (
+		      	ECHO %%i to "!vol! - !BonusIndex! - !plusTime! Extra.mkv">> !logFile!
+          			ren "!tempVidDir!%%i" "!vol! - !BonusIndex! - !plusTime! Extra.mkv"
+			)
 		)
 	) ELSE (
 	   REM rename films to parts after the first title
@@ -1300,17 +1319,23 @@ FOR /F "delims=|" %%i in ('dir /b /O:N !tempVidDir!*.mkv*') DO (
 				)
 			)
 
-			ECHO %%i to "!vol!!sep!!episodeNum! - !plusTime! Title.mkv">> !logFile!
-			ren "!tempVidDir!%%i" "!vol!!sep!!episodeNumText! - !plusTime! Title.mkv"
+			IF NOT EXIST "!vol!!sep!!episodeNumText! - !plusTime! Title.mkv" (
+				ECHO %%i to "!vol!!sep!!episodeNum! - !plusTime! Title.mkv">> !logFile!
+				ren "!tempVidDir!%%i" "!vol!!sep!!episodeNumText! - !plusTime! Title.mkv"
+			)
 		) ELSE (
 		   REM if there is more than 1 part to a film then number them
 		   IF !episodeNum! GTR 1 (
-		      ECHO %%i to "!vol!!sep!!episodeNum!.mkv">> !logFile!
-            ren "!tempVidDir!%%i" "!vol!!sep!!episodeNum!.mkv"
-			) ELSE (
-			   ECHO %%i to "!vol!.mkv">> !logFile!
-            ren "!tempVidDir!%%i" "!vol!.mkv"
+			IF NOT EXIST "!vol!!sep!!episodeNum!.mkv" (
+		      	ECHO %%i to "!vol!!sep!!episodeNum!.mkv">> !logFile!
+            		ren "!tempVidDir!%%i" "!vol!!sep!!episodeNum!.mkv"
 			)
+		   ) ELSE (
+			IF NOT EXIST "!vol!.mkv" (
+			   	ECHO %%i to "!vol!.mkv">> !logFile!
+            		ren "!tempVidDir!%%i" "!vol!.mkv"
+			)
+		   )
 		)
 	)
    SET /A index+=1
@@ -1319,8 +1344,7 @@ CALL :waiting 3
 IF EXIST "!renameFile!" (
 	del "!renameFile!"
 )
-REM Converting titles ====================================================
-:converting
+
 ECHO !seperator! >> !statusFile!
 
 ECHO Converting files>> !statusFile!
@@ -1387,7 +1411,11 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 				IF !convertSuccess!==TRUE (
 					SET "convertSuccess=TRUE"
 				)
+			) ELSE (
+				CALL :writeAndLog Converted video too short "!outputVideoLength!"
 			)
+		) ELSE (
+			CALL :writeAndLog Conversion FAILED______________
 		)
 	)
 	
@@ -1570,7 +1598,7 @@ REM Check to see if analyzation is complete
 REM detect if HandBrake dies
 CALL :taskRunning HandBrakeCLI.exe
 IF !taskIsRunning! EQU FALSE (
-	IF !HandBrakeWaitingCount! GEQ 10 (
+	IF !HandBrakeWaitingCount! GEQ 20 (
 		CALL :writeLog "HandBrake Done"
 		GOTO :handBrakeExit
 	) ELSE (
