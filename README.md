@@ -26,5 +26,5 @@ interested in translating to power shell, please let me know.
 VideoRip is provided as freeware under the GNU Public License. You may not use
 this software to create any program that you charge money for or earn profit from.
 The main focus of VideoRip is to provide free video backup capabilities. You may 
-modify the software as you lie. You are responsible for any new software that you
+modify the software as you like. You are responsible for any new software that you
 produce deriving from VideoRip.
