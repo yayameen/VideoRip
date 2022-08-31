@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+SET "VideoRipVersion=1.0.1"
+SET "VideoRipName=VideoRip !VideoRipVersion!"
+
 IF "!workingDir!" == "" (
    SET "workingDir=C:\Users\Public\Scripts"
 )
@@ -11,10 +14,11 @@ IF "!logFile!" == "" (
    SET "logFile=!workingDir!\conversionLog.txt"
 )
 
-ECHO Starting. Log file is !logFile!
-ECHO Starting > !statusFile!
-ECHO Starting > !logFile!
-ECHO season !seasonNum! >> !logFile! 
+REM Erases previous log. Do not change these to write calls
+ECHO Starting !VideoRipName!. Log file is !logFile!
+ECHO !VideoRipName! > !logFile!
+ECHO !VideoRipName! > !statusFile!
+CALL :writeLog season !seasonNum!
 
 
 IF "!tempVidDir!" == "" (
@@ -203,12 +207,14 @@ IF "!vol!" == "" (
 REM Formatting video filename ===========================================
 
 REM remove spaces and illegal chars
-SET "vol=!vol:|=_!"
+SET "vol=!vol:|=｜!"
+SET "vol=!vol:>=﹥!"
+SET "vol=!vol:<=﹤!"
 SET vol=!vol: =_!
-SET vol=!vol:"=!
-SET "vol=!vol::=_!"
-SET "vol=!vol:\=_!"
-SET "vol=!vol:/=_!"
+SET vol=!vol:"=＂!
+SET "vol=!vol::=﹕!"
+SET "vol=!vol:\=﹨!"
+SET "vol=!vol:/=／!"
 SET "vol=!vol:__=_!"
 ECHO Formatted Name is !vol! >>!logFile!
 
@@ -271,7 +277,7 @@ CALL :writeLog "Ripping !mediaType!"
 
 IF "!mediaType!" == "FILM" (
 	SET "vol=!vol:_= !"
-
+	SET "seasonNum="
 	IF NOT EXIST "!FilmFolder!!showDir!" (
 		ECHO Making folder "!FilmFolder!!showDir!">>!logFile!
       mkdir "!FilmFolder!!showDir!"
@@ -519,42 +525,42 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 	CALL :writeLog "   Get stream type"
 	SET titleNum[!i!]=!episodeCount!
 	SET isSubStream=FALSE
-   FIND "TINFO:%%A,16,0" !discInfoFile! > "!tempFile!"
-   IF !ERRORLEVEL! EQU 0 (
-      FIND "2ts""" "!tempFile!" >nul
-      IF !ERRORLEVEL! EQU 0 (
-		    SET isSubStream=TRUE
-			 CALL :writeLog "Found Transport Stream"
+	FIND "TINFO:%%A,16,0" !discInfoFile! > "!tempFile!"
+	IF !ERRORLEVEL! EQU 0 (
+      	FIND "2ts""" "!tempFile!" >nul
+      	IF !ERRORLEVEL! EQU 0 (
+			SET isSubStream=TRUE
+			CALL :writeLog "Found Transport Stream"
 		) ELSE (
-		    FIND "mpls(" "!tempFile!" >nul
-          IF !ERRORLEVEL! EQU 0 (
-		        SET isSubStream=TRUE
-				  CALL :writeLog "Found Sub Playlist"
-		    )
-		)
+			FIND "mpls(" "!tempFile!" >nul
+      		IF !ERRORLEVEL! EQU 0 (
+	      		SET isSubStream=TRUE
+				CALL :writeLog "Found Sub Playlist"
+	    	)
+	)
 		
-		IF !isSubStream! EQU TRUE (
-	      FOR /L %%K in (1,1,!titleSegCount!) DO (
-		      FOR /L %%E in (1,1,!segCount!) DO (
-		         IF !segList[%%E]! == !titleSegList[%%K]! (
-			         ECHO Skipping %%A due to duplicate segment !segList[%%E]! >> !logFile!
+	IF !isSubStream! EQU TRUE (
+		FOR /L %%K in (1,1,!titleSegCount!) DO (
+		  FOR /L %%E in (1,1,!segCount!) DO (
+		    IF !segList[%%E]! == !titleSegList[%%K]! (
+		    	ECHO Skipping %%A due to duplicate segment !segList[%%E]! >> !logFile!
                   SET badTitle=%%A
-				   )
-			   )
-		   )         
+		    )
+		  )
+		)         
       )
 		
-		REM Get filename for episode ordering
-		CALL :writeLog "   Get filename for episode ordering"
-		FOR /f "delims=" %%x IN (!tempFile!) DO SET titleName=%%x
-      	SET "titleName=!titleName:~13,-1!"
-      	SET "titleName=!titleName:,=!"
-      	SET "titleName=!titleName:"=!"
-		SET "titleName=!titleName:"=!"
-      	SET "titleName=!titleName: =!"
-      	SET "titleName=!titleName:	=!"
-	   	SET "titleName=!titleName:.mpls=.mkv!"
-      	SET "titleName=!titleName:.m2ts=ts.mkv!"
+	REM Get filename for episode ordering
+	CALL :writeLog "   Get filename for episode ordering"
+	FOR /f "delims=" %%x IN (!tempFile!) DO SET titleName=%%x
+     	SET "titleName=!titleName:~13,-1!"
+     	SET "titleName=!titleName:,=!"
+     	SET "titleName=!titleName:"=!"
+	SET "titleName=!titleName:"=!"
+     	SET "titleName=!titleName: =!"
+     	SET "titleName=!titleName:	=!"
+   	SET "titleName=!titleName:.mpls=.mkv!"
+     	SET "titleName=!titleName:.m2ts=ts.mkv!"
 		
    )
 	
@@ -854,11 +860,11 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 				REM Match the user supplied length. ========
 				REM This is only needed for Lions Gate, which adds multiple playlists to trick you.
 				REM Also can be used to select a particular edition of the film.
-				IF NOT "!userLength!" == "" (
+				IF NOT "!userLength!"=="" (
 					
 					SET subLength=!currentTitleLength:~0,4!
-					CALL :writeLog "   Matching title length !userLength!"
-					IF "!userLength!" == "!subLength!" (
+					CALL :writeLog "   Checking for title length match !userLength!"
+					IF "!userLength!"=="!subLength!" (
 						CALL :writeLog "Found title that matched user length"
 						SET foundTitle=TRUE
 					) ELSE (
@@ -874,14 +880,14 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 						) ELSE (
 						    SET "subLength=!currentTitleLength:~0,2!!minutesLength!"
 						)
-						IF "!userLength!" == "!subLength!" (
+						IF "!userLength!"=="!subLength!" (
 							CALL :writeLog "Found title that rounded up to user length !subLength!" 
 							SET foundTitle=TRUE
 						) ELSE (
 						      IF NOT !takeFirstTitle! == TRUE (
 								SET foundTitle=FALSE
 								SET badTitle=%%A
-								CALL :writeLog "    Title does not match user length !subLength!"
+								CALL :writeLog "    Skipping title due to wrong length !subLength!"
 							) ELSE (
 								CALL :writeLog "    Using first title even though title does not match user length"
 								SET foundTitle=TRUE
@@ -1043,9 +1049,9 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		REM Add 'z' to title to make bonus feature move to the end
 		IF !IsBonus! EQU TRUE (
 	      
-		   IF "!titleName!" EQU "" (
-		      SET "titleName=!outputName!"
-		   )
+		   	IF "!titleName!"=="" (
+		   	   SET "titleName=!outputName!"
+		  	)
 			
 			SET titleName=!titleName:"=!
 			SET titleName=!titleName:"=!
@@ -1063,7 +1069,7 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		CALL :getLastLine "!tempFile!"
 		
 		SET "titleDescription=!lastLine=~16,-2"
-		IF NOT "!titleDescription:(angle=!" == "!titleDescription!" (
+		IF NOT "!titleDescription:(angle=!"=="!titleDescription!" (
 			IF NOT !keepAngles! == TRUE (
 			     CALL :writeAndLog "Skipping additional angle."
 			     SET badTitle=%%A
@@ -1094,7 +1100,9 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		IF !badTitle! NEQ %%A (
 			REM save the output name in order to rename this file
 			
-		   ECHO !outputName!#!titleName!>> !renameFile!
+			IF NOT "!titleName!"=="" (
+		   		ECHO !outputName!#!titleName!>> !renameFile!
+			)
 			
 			REM remember the last filename to detect multiple angles
 			IF "!discType!" == "Blu-Ray" (
@@ -1238,8 +1246,10 @@ FOR /f "delims=" %%w in (!renameFile!) DO (
       ECHO: ren "!tempVidDir!!newName!" >> !logFile!
 	ren "!tempVidDir!!newName!"
 	IF NOT !ERRORLEVEL! EQU 0 (
-		ECHO RENAMING FAILURE >> !statusFile!
-		GOTO :eof
+		IF !mediaType!==TV (
+			ECHO RENAMING FAILURE >> !statusFile!
+			GOTO :eof
+		)
 	)
 )
 CALL :waiting 1
@@ -1451,7 +1461,7 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 	SET /A index+=1
 )
 
-ECHO 99 > !ripProgressFile!
+ECHO 100 > !ripProgressFile!
 
 :final
 REM Delete temporary files ============================================
