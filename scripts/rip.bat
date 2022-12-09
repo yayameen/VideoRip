@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-SET "VideoRipVersion=1.0.1"
+SET "VideoRipVersion=1.2"
 SET "VideoRipName=VideoRip !VideoRipVersion!"
 
 IF "!workingDir!" == "" (
@@ -15,10 +15,10 @@ IF "!logFile!" == "" (
 )
 
 REM Erases previous log. Do not change these to write calls
-ECHO Starting !VideoRipName!. Log file is !logFile!
+ECHO Starting !VideoRipName!
+ECHO Log file is !logFile!
 ECHO !VideoRipName! > !logFile!
 ECHO !VideoRipName! > !statusFile!
-CALL :writeLog season !seasonNum!
 
 
 IF "!tempVidDir!" == "" (
@@ -185,6 +185,10 @@ FOR /F "tokens=1-5*" %%1 IN ('vol !drive!:') DO (
 SET "forceRip=FALSE"
 ECHO Analyzing Disc >>!logFile!
 CALL :writeLine "Analyzing Disc %drive%"
+
+SET StartDecryptTime=%TIME: =0%
+SET StartDecryptTime=%StartDecryptTime:~3,2%
+ECHO Disc Decryption Started >>!logFile!
 IF NOT EXIST !discInfoFile! ( 
 	CALL :getLastLine "!volNameFile!"
 	IF NOT "!lastLine!"=="!drvVol!" (
@@ -194,28 +198,61 @@ IF NOT EXIST !discInfoFile! (
 	)
 )
 
+SET EndDecryptTime=%TIME: =0%
+SET EndDecryptTime=%EndDecryptTime:~3,2%
+
+ECHO Disc Decryption Complete >>!logFile!
+IF !StartDecryptTime! GTR !EndDecryptTime! (
+	SET /a DecryptTimeMins=60+!EndDecryptTime!
+	SET /a DecryptTimeMins=!DecryptTimeMins!-!StartDecryptTime!
+) ELSE (
+	SET /a DecryptTimeMins=!EndDecryptTime!-!StartDecryptTime!
+)
+ECHO Decryption Took !DecryptTimeMins! Min >>!logFile!
+
+REM If decryption takes a long time, then rip the entire DVD in a single
+REM operation in order to decrease ripping duration.
+REM Not doing the same for Blu-ray because of the large size and possibility
+REM of streams being included in multiple titles can cause the output to grow
+REM to 100s of GBs.
+SET DecryptAllTitles=FALSE
+IF !DecryptTimeMins! GTR 3 (
+	IF "!discType!"=="DVD" (
+		ECHO Decrypting entire disc at once >>!logFile!
+		SET DecryptAllTitles=TRUE
+	) ELSE (
+		CALL :writeAndLog "Ripping will take longer than expected"
+	)
+)
+
 
 IF "!vol!" == "" (
-  CALL :writeAndLog "Reading Disc Name"
-  FIND "CINFO:2,0," !discInfoFile! > "!tempFile!"
-  FOR /f "delims=" %%x IN (!tempFile!) DO SET vol=%%x
-  IF NOT "!vol!" == "" (
-    SET vol=!vol:~10!
-  )
+   CALL :writeAndLog "Reading Disc Name"
+   FIND "CINFO:2,0," !discInfoFile! > "!tempFile!"
+   IF !ERRORLEVEL! EQU 0 (
+      FOR /f "delims=" %%x IN (!tempFile!) DO SET vol=%%x
+      IF NOT "!vol!" == "" (
+        SET vol=!vol:~10!
+      )
+   )
 )
 
 REM Formatting video filename ===========================================
 
 REM remove spaces and illegal chars
-SET "vol=!vol:|=｜!"
-SET "vol=!vol:>=﹥!"
-SET "vol=!vol:<=﹤!"
-SET vol=!vol: =_!
-SET vol=!vol:"=＂!
-SET "vol=!vol::=﹕!"
-SET "vol=!vol:\=﹨!"
-SET "vol=!vol:/=／!"
+REM SET "vol=!vol:|=｜!"
+REM SET "vol=!vol:>=﹥!"
+REM SET "vol=!vol:<=﹤!"
+
+SET "vol=!vol:|=_!"
+SET "vol=!vol:>=_!"
+SET "vol=!vol:<=_!"
+SET "vol=!vol: =_!"
+SET "vol=!vol::=_!"
+SET "vol=!vol:\=_!"
+SET "vol=!vol:/=_!"
 SET "vol=!vol:__=_!"
+SET vol=!vol:"=!
 ECHO Formatted Name is !vol! >>!logFile!
 
 REM remove disc from title name =========================================
@@ -999,10 +1036,15 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 					) ELSE (						
 						REM Replace the main title if this one is longer
 						IF !currentTitleLength! GTR !mainTitleLength! (
-							CALL :writeAndLog "Choosing New Main Title Due To Title Length."
-							SET foundMainTitle=TRUE
-							SET mainTitleLength=!currentTitleLength!
-							SET mainAudioChannelCount=!audioChannelCount!
+							IF !chapterCount! GTR 1 (
+								CALL :writeAndLog "Choosing New Main Title Due To Title Length."
+								SET foundMainTitle=TRUE
+								SET mainTitleLength=!currentTitleLength!
+								SET mainAudioChannelCount=!audioChannelCount!
+							) ELSE (
+								CALL :writeAndLog "Skipping title %%A due to length and chapters."
+								SET badTitle=%%A
+							)
 						) ELSE (
 							CALL :writeAndLog "Skipping title %%A because it is over 1.5 hours long."
 							SET badTitle=%%A
@@ -1044,22 +1086,31 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 	)
 
 	REM Add accepted titles to convert list ==============================	
-   IF !badTitle! NEQ %%A (
+     IF !badTitle! NEQ %%A (
+         
 		ECHO Add accepted title to convert list >> !logFile!
 		REM Add 'z' to title to make bonus feature move to the end
 		IF !IsBonus! EQU TRUE (
-	      
-		   	IF "!titleName!"=="" (
-		   	   SET "titleName=!outputName!"
-		  	)
-			
+                IF "!titleName!"=="" (
+                    SET "titleName=!outputName!"
+                )
 			SET titleName=!titleName:"=!
 			SET titleName=!titleName:"=!
 			
 			SET "titleName=z!titleName!"
 			
 		   CALL :writeLog "Found extra feature !i! !titleName!"
-	   )
+	      ) ELSE (
+               REM Decrypting all titles means we need to move the files.
+               REM This is done using the rename file list
+               IF !DecryptAllTitles! EQU TRUE (
+                   IF "!titleName!"=="" (
+                       SET "titleName=!outputName!"
+                   )
+			   SET titleName=!titleName:"=!
+			   SET titleName=!titleName:"=!
+               )
+           )
 		
 		REM if duplicate name is detected, hopefully consecutive
 		REM it may be a second angle of the same film.
@@ -1101,6 +1152,8 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 			REM save the output name in order to rename this file
 			
 			IF NOT "!titleName!"=="" (
+				REM SET "titleName=!titleName:(=!"
+				REM SET "titleName=!titleName:)=!"
 		   		ECHO !outputName!#!titleName!>> !renameFile!
 			)
 			
@@ -1188,6 +1241,43 @@ SET progressDiv=!i!
 CALL :waiting 3
 
 SET ripCount=0
+
+SET "MakeMKVDir=MakeMKV"
+IF !DecryptAllTitles!==TRUE (
+	ECHO: Ripping All Titles for speed >>!logFile!
+	md !tempVidDir!del
+	ECHO: "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all !tempVidDir!del >>!logFile!
+	START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all !tempVidDir!del
+		
+	CALL :waiting 3
+	IF ERRORLEVEL 1       (
+		ECHO ERROR>>!statusFile!
+		goto :eof
+	)
+	CALL :waitingForMKV
+
+	FOR /f "delims=" %%w in (!renameFile!) DO (
+ 	  SET newName=%%w
+		REM SET newName=!newName:#=" "..\!
+		CALL SET newName=%%newName:#=" "%tempVidDir%%%
+
+		REM quotes screw up rename
+		SET "newName=!newName:'=?!"
+		SET "newName=!newName:,=?!"
+ 	     ECHO: rename "!tempVidDir!!newName!" >> !logFile!
+		move "!tempVidDir!del\!newName!"
+		IF NOT !ERRORLEVEL! EQU 0 (
+			IF !mediaType!==TV (
+				ECHO RENAMING FAILURE >> !statusFile!
+				GOTO :eof
+			)
+		)
+	)
+	CALL :waiting 1
+	del /F /S /Q !tempVidDir!del
+	GOTO :converting
+)
+
 FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 
 	IF EXIST "!tempFile!" (
@@ -1198,15 +1288,7 @@ FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 		del "!progressFile!"
 	)
 	
-	REM Skip files already ripped
-	SET "MakeMKVDir=MakeMKV"
-	REM IF !discType!==DVD (
-	REM 	IF !mediaType!==FILM (
-	REM		IF EXISTS "%ProgramFiles(x86)%\MakeMKV110\makemkvcon.exe" (
-	REM			SET "MakeMKVDir=MakeMKV110"
-	REM		)
-	REM	)
-	REM )
+	REM Skip files already ripped	
 	IF !ripCount! GEQ !Filesx! (
 		START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% %%i !tempVidDir!
 		
@@ -1224,6 +1306,8 @@ FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 	ECHO !ripProgressPercent!> !ripProgressFile!
 )
 SET Filesx=!ripCount!
+
+:renaming
 ECHO !seperator!>> !statusFile!
 del /q "titleList.txt"
 ECHO 20 > !ripProgressFile!
@@ -1236,14 +1320,12 @@ REM The first rename sorts files alphabetically ===========================
 REM This gives the best chance for TV shows to be in correct order ========
 FOR /f "delims=" %%w in (!renameFile!) DO (
    SET newName=%%w
-   SET "newName=!newName:(=!"
-	SET "newName=!newName:)=!"
 	SET newName=!newName:#=" "!
 
 	REM quotes screw up rename
 	SET "newName=!newName:'=?!"
 	SET "newName=!newName:,=?!"
-      ECHO: ren "!tempVidDir!!newName!" >> !logFile!
+      ECHO: rename "!tempVidDir!!newName!" >> !logFile!
 	ren "!tempVidDir!!newName!"
 	IF NOT !ERRORLEVEL! EQU 0 (
 		IF !mediaType!==TV (
@@ -1473,11 +1555,13 @@ IF !convertSuccess! == TRUE (
       CALL :waiting 1
       del "!tempVidDir!%%i"
    )
-	REM Eject Disc if successful ===========================================
-   ECHO Ejecting Disc !drive! >> !statusFile!
-   CALL :waiting 1
-   powershell.exe -Command "& {$obj = (new-object -comObject Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')}"
 
+   REM Eject Disc if successful ===========================================
+   IF !EjectOnComplete!==TRUE (
+      ECHO Ejecting Disc !drive! >> !statusFile!
+      CALL :waiting 1
+      powershell.exe -Command "& {$obj = (new-object -comObject Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')}"
+   )
 ) ELSE (
    SET ConversionResult=failed
    ECHO Conversion failed! >> !statusFile!
