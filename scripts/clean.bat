@@ -8,5 +8,8 @@ IF "!tempConvertDir!" EQU "" (
    SET tempConvertDir=J:\TEMP\
 )
 
-del "!tempVidDir!*"
-del "!tempConvertDir!*"
+del /F /Q "!tempVidDir!*"
+del /F /Q "!tempConvertDir!*"
+del /F /Q "discInfo.txt"
+del /F /Q "volName.txt"
+del /F /Q "rename.txt"

@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-SET "VideoRipVersion=1.2"
+SET "VideoRipVersion=1.3"
 SET "VideoRipName=VideoRip !VideoRipVersion!"
 
 IF "!workingDir!" == "" (
@@ -324,9 +324,14 @@ IF "!mediaType!" == "FILM" (
 
 ) ELSE (
 REM Additional season name processing
-   CALL :writeLine "   Additional season name processing"
-   SET "newVol=!newVol:_THE_COMPLETE_=_!"
+   CALL :writeAndLog "   Additional season name processing"
+    
+    SET "newVol=!newVol:_THE_COMPLETE_=_!"
 	SET "newVol=!newVol!##"
+	SET "newVol=!newVol: ##=##!"
+	SET "newVol=!newVol: ##=##!"
+	SET "newVol=!newVol: ##=##!"
+	SET "tempText=!newVol:##=!"
 	SET "newVol=!newVol:_FIRST_S##=_s01!"
 	SET "newVol=!newVol:_SECOND_S##=_s02!"
 	SET "newVol=!newVol:_THIRD_S##=_s03!"
@@ -349,9 +354,10 @@ REM Additional season name processing
 	
 	IF "!seasonNum!"=="" (
 		CALL :writeLog "Detecting Season Number"
-		IF "!newVol!" == "!vol!" (
+		IF "!newVol!" == "!tempText!" (
 			CALL :writeLog "  Checking Title Name"
 			SET "seasonNum=!newdrvVol:~-2!"
+			SET "seasonNum=!seasonNum: =0!"
 			SET "showDir=!tempSeasonName!"
 			IF "!seasonNum!" GTR "99" (
 				CALL :writeLog "  Checking For single digit number"
@@ -363,12 +369,13 @@ REM Additional season name processing
 					SET "seasonNum=0!newdrvVol:~-1!"
 				)
 			) 
-			SET "newVol=!newVol! - s!seasonNum!"
+			REM SET "newVol=!newVol! - s!seasonNum!"
 		) ELSE (
+		    CALL :writeLog "   !newVol! doesn't match !tempText!"
 			SET "seasonNum=A"
 		)
 
-		IF "!seasonNum!" GTR "9" (
+		IF "!seasonNum:~1!" GTR "9" (
 			CALL :writeLog "  Checking Volume Name"
 			REM set to PLEX format ==================================================
 			SET "tempSeasonName=!newVol:_s0= - s0!"
@@ -380,6 +387,7 @@ REM Additional season name processing
 		IF "!seasonNum!" LEQ "0" (
 			SET "seasonNum=01"
 		)
+		CALL :writeLog "Season Number " !seasonNum!
 	)
 	SET "seasonDir=Season !seasonNum!"
 	
@@ -864,9 +872,15 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 				
 				REM Check number of audio languages ============================================
 				CALL :countLang %%A
-				IF !episodeLangCount! GTR !langCount! (
+				IF !episodeLangCount! GTR !audioLangCount! (
 					SET IsBonus=TRUE
-					CALL :writeLog Assuming %%A "is bonus due to missing languages"
+					CALL :writeLog Assuming %%A "is bonus due to missing audio language"
+				)
+				
+				REM Check number of subtitle languages ============================================
+				IF !episodeSubLangCount! GTR !subtitleLangCount! (
+					SET IsBonus=TRUE
+					CALL :writeLog Assuming %%A "is bonus due to missing subtitle language"
 				)
 
 				REM Detect bonus features by their short length ===============================
@@ -1845,8 +1859,10 @@ IF !ERRORLEVEL! EQU 0 (
 )
 
 CALL :countLang %1
-SET episodeLangCount=!langCount!
-CALL :writeLog "episode has !episodeLangCount! languages"
+SET episodeLangCount=!audioLangCount!
+CALL :writeLog "episode has !episodeLangCount! audio languages"
+SET episodeSubLangCount=!subtitleLangCount!
+CALL :writeLog "episode has !episodeSubLangCount! subtitle languages"
 
 CALL :writeLog "Detected !EpisodeLength! minute episodes"
 EXIT /B
@@ -1890,6 +1906,8 @@ REM ############################################################################
 REM Count Audio Languages in a title
 :countLang
 SET langCount=0
+SET audioLangCount=0
+SET subtitleLangCount=0
 SET "langs="
 SET countLangSkip=1
  REM Determine number of columns to skip
@@ -1898,11 +1916,19 @@ REM Find audio stream numbers
 SET "outLine=FINDSTR ,\"Audio\" !discInfoFile!"
 ECHO:    Processing audio streams >> !logFile!
 ECHO UNK > langs.txt
+ECHO UNK > audioLangs.txt
+ECHO UNK > subtitleLangs.txt
 
 REM In each audio stream, get the language code
 FOR /L %%Q IN (1,1,50) DO (	
 	
-	REM Get the language code lines
+	REM Get the language code lines	
+	FINDSTR "SINFO:%1,%%Q,14,0," !discInfoFile!">nul
+	IF !ERRORLEVEL! EQU 0 (
+	    SET "langFile=audio"
+	) ELSE (
+		SET "langFile=subtitle"
+	)
 	SET "outLine2=FINDSTR "SINFO:%1,%%Q,3,0," !discInfoFile!"
 	FOR /F %%R in ('!outLine2!') DO (
 		REM parse the language code from the line
@@ -1911,15 +1937,29 @@ FOR /L %%Q IN (1,1,50) DO (
 		
 		REM Determine if the code ws already processed by logging to a file
 		FIND "!lang!" langs.txt >nul
-      IF !ERRORLEVEL! NEQ 0 (
-			ECHO:    Found language !lang! >> !logFile!
-			ECHO: !lang! >> langs.txt
-			SET /A langCount+=1
+        IF !ERRORLEVEL! NEQ 0 (
+		    SET /A langCount+=1
+			ECHO: !lang!>> langs.txt
+		)
+		FIND "!lang!" !langFile!Langs.txt >nul
+        IF !ERRORLEVEL! NEQ 0 (
+			ECHO:    Found !langFile! language !lang! >> !logFile!
+			ECHO: !lang!>> !langFile!Langs.txt
+			
+			IF !langFile! == audio (
+			    SET /A audioLangCount+=1
+			) ELSE (
+				SET /A subtitleLangCount+=1
+			)
 		)
 	)
 )
-ECHO: Found !langCount! audio streams>> !logFile!
+ECHO: Found !langCount! languages>> !logFile!
+ECHO: Found !audioLangCount! audio languages>> !logFile!
+ECHO: Found !subtitleLangCount! subtitle languages>> !logFile!
 del langs.txt
+del audioLangs.txt
+del subtitleLangs.txt
 EXIT /B
 
 REM set the episodeNum variables
@@ -2242,6 +2282,11 @@ SET parseText=%parseText:_S6##=##%
 SET parseText=%parseText:_S7##=##%
 SET parseText=%parseText:_S8##=##%
 SET parseText=%parseText:_S9##=##%
+
+REM Trim end
 SET parseText=%parseText:_##=##%
+SET parseText=%parseText: ##=##%
+SET parseText=%parseText: ##=##%
+SET parseText=%parseText: ##=##%
 SET parseText=%parseText:##=%
 EXIT /B
