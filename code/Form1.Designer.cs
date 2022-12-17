@@ -381,6 +381,7 @@ namespace VideoRip
             this.textBoxLanguage.Name = "textBoxLanguage";
             this.textBoxLanguage.Size = new System.Drawing.Size(67, 20);
             this.textBoxLanguage.TabIndex = 22;
+            this.textBoxLanguage.Text = "eng";
             this.textBoxLanguage.TextChanged += new System.EventHandler(this.textBoxLanguage_TextChanged);
             this.textBoxLanguage.Validating += new System.ComponentModel.CancelEventHandler(this.textBoxLanguage_Validating);
             // 
@@ -479,6 +480,7 @@ namespace VideoRip
             this.textValue1.Name = "textValue1";
             this.textValue1.Size = new System.Drawing.Size(172, 20);
             this.textValue1.TabIndex = 11;
+            this.textValue1.Text = "TRUE";
             this.textValue1.TextChanged += new System.EventHandler(this.textValue1_TextChanged);
             // 
             // textName1
@@ -487,6 +489,7 @@ namespace VideoRip
             this.textName1.Name = "textName1";
             this.textName1.Size = new System.Drawing.Size(100, 20);
             this.textName1.TabIndex = 10;
+            this.textName1.Text = "EjectOnComplete";
             this.textName1.TextChanged += new System.EventHandler(this.textName1_TextChanged);
             // 
             // labelOtherParam
@@ -554,6 +557,7 @@ namespace VideoRip
             this.textTempConvertDir.Name = "textTempConvertDir";
             this.textTempConvertDir.Size = new System.Drawing.Size(124, 20);
             this.textTempConvertDir.TabIndex = 3;
+            this.textTempConvertDir.Text = "%LOCALAPPDATA%\\VideoRip\\Temp\\Convert\\";
             this.textTempConvertDir.TextChanged += new System.EventHandler(this.textTempConvertDir_TextChanged);
             // 
             // textTempRipDir
@@ -562,6 +566,7 @@ namespace VideoRip
             this.textTempRipDir.Name = "textTempRipDir";
             this.textTempRipDir.Size = new System.Drawing.Size(124, 20);
             this.textTempRipDir.TabIndex = 2;
+            this.textTempRipDir.Text = "%LOCALAPPDATA%\\VideoRip\\Temp\\Rip\\";
             this.textTempRipDir.TextChanged += new System.EventHandler(this.textTempRipDir_TextChanged);
             // 
             // labelTempConvertDir
@@ -831,6 +836,7 @@ namespace VideoRip
             this.comboRepair.Name = "comboRepair";
             this.comboRepair.Size = new System.Drawing.Size(108, 21);
             this.comboRepair.TabIndex = 24;
+            this.comboRepair.SelectedIndexChanged += new System.EventHandler(this.comboBox1_SelectedIndexChanged);
             // 
             // Form1
             // 

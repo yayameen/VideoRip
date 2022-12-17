@@ -489,6 +489,7 @@ namespace VideoRip
             if (!string.IsNullOrWhiteSpace(TempConvertDirectory))
             {
                 string tempConvertDirectory = TempConvertDirectory;
+                Directory.CreateDirectory(tempConvertDirectory);
                 if (!tempConvertDirectory.EndsWith("\\"))
                 {
                     tempConvertDirectory += "\\";
@@ -498,6 +499,7 @@ namespace VideoRip
             if (!string.IsNullOrWhiteSpace(TempRipDirectory))
             {
                 string tempRipDirectory = TempRipDirectory;
+                Directory.CreateDirectory(tempRipDirectory);
                 if (!tempRipDirectory.EndsWith("\\"))
                 {
                     tempRipDirectory += "\\";
@@ -520,6 +522,10 @@ namespace VideoRip
 
             if (!String.IsNullOrWhiteSpace(VideoOutputLocation))
             {
+                Directory.CreateDirectory(VideoOutputLocation);
+                Directory.CreateDirectory(Path.Combine(VideoOutputLocation, "TV"));
+                Directory.CreateDirectory(Path.Combine(VideoOutputLocation, "Films"));
+                Directory.CreateDirectory(VideoOutputLocation);
                 Set(startInfo.EnvironmentVariables, "TvFolder", Path.Combine(VideoOutputLocation, "TV") + "\\");
                 Set(startInfo.EnvironmentVariables, "FilmFolder", Path.Combine(VideoOutputLocation, "Films") + "\\");
             }

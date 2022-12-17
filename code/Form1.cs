@@ -603,7 +603,7 @@ namespace VideoRip
             }
             else
             {
-                SaveSettings();
+                SaveSettings().Wait(4000);
             }
         }
 
