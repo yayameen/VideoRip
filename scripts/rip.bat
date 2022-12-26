@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-SET "VideoRipVersion=1.3"
+SET "VideoRipVersion=1.3.1"
 SET "VideoRipName=VideoRip !VideoRipVersion!"
 
 IF "!workingDir!" == "" (
@@ -1571,7 +1571,7 @@ IF !convertSuccess! == TRUE (
    )
 
    REM Eject Disc if successful ===========================================
-   IF !EjectOnComplete!==TRUE (
+   IF "!EjectOnComplete!"=="TRUE" (
       ECHO Ejecting Disc !drive! >> !statusFile!
       CALL :waiting 1
       powershell.exe -Command "& {$obj = (new-object -comObject Shell.Application).NameSpace(17).ParseName('!drive!:');$obj.InvokeVerb('Eject')}"
@@ -1923,7 +1923,7 @@ REM In each audio stream, get the language code
 FOR /L %%Q IN (1,1,50) DO (	
 	
 	REM Get the language code lines	
-	FINDSTR "SINFO:%1,%%Q,14,0," !discInfoFile!">nul
+	FIND "SINFO:%1,%%Q,14,0," !discInfoFile! >nul
 	IF !ERRORLEVEL! EQU 0 (
 	    SET "langFile=audio"
 	) ELSE (
