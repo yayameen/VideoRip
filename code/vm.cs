@@ -373,9 +373,9 @@ namespace VideoRip
                 {
                     FilmLengthError = "Invalid Time";
                 }
-                if (length < 80)
+                if (length < 8)
                 {
-                    FilmLengthError = "Too short. Must be at least 80 minutes";
+                    FilmLengthError = "Too short. Must be at least 8 minutes";
                 }
                 if (length > 360)
                 {
