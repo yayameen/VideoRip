@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-SET "VideoRipVersion=1.3.1"
+SET "VideoRipVersion=1.3.3"
 SET "VideoRipName=VideoRip !VideoRipVersion!"
 
 IF "!workingDir!" == "" (
@@ -14,11 +14,36 @@ IF "!logFile!" == "" (
    SET "logFile=!workingDir!\conversionLog.txt"
 )
 
+REM Set the minimum title length if it was not set externally
+SET "tempUserLength=!userLength!"
+SET "userHour=0"
+:setMinTitleLength
+IF "!MinTitleLength!" == "" (
+   IF "!tempUserLength!" == "" (
+      SET "MinTitleLength=1:20:00"
+   ) ELSE (
+      REM Ensure minimum title length is at least user title length
+	  SET "tempUserLength=%userLength:~-2%"
+	  SET "userHour=%userLength:~0,1%"
+	  IF !tempUserLength! GTR 0 (
+        SET /A "tempUserLength-=1"
+      )
+	  IF !tempUserLength! LSS 10 (
+	     SET "MinTitleLength=!userHour!:0!tempUserLength!:00"
+	   ) ELSE (
+	      SET "MinTitleLength=!userHour!:!tempUserLength!:00"
+	   )
+   )
+)
+
+:printVersion
 REM Erases previous log. Do not change these to write calls
 ECHO Starting !VideoRipName!
 ECHO Log file is !logFile!
 ECHO !VideoRipName! > !logFile!
 ECHO !VideoRipName! > !statusFile!
+ECHO Min Title Length is !MinTitleLength! > !logFile!
+
 
 
 IF "!tempVidDir!" == "" (
@@ -186,8 +211,10 @@ SET "forceRip=FALSE"
 ECHO Analyzing Disc >>!logFile!
 CALL :writeLine "Analyzing Disc %drive%"
 
-SET StartDecryptTime=%TIME: =0%
+SET StartDecryptTime=%TIME%
 SET StartDecryptTime=%StartDecryptTime:~3,2%
+SET StartDecryptTime=%StartDecryptTime: =%
+SET StartDecryptTime=%StartDecryptTime::=%
 ECHO Disc Decryption Started >>!logFile!
 IF NOT EXIST !discInfoFile! ( 
 	CALL :getLastLine "!volNameFile!"
@@ -198,8 +225,10 @@ IF NOT EXIST !discInfoFile! (
 	)
 )
 
-SET EndDecryptTime=%TIME: =0%
+SET EndDecryptTime=%TIME%
 SET EndDecryptTime=%EndDecryptTime:~3,2%
+SET EndDecryptTime=%EndDecryptTime: =%
+SET EndDecryptTime=%EndDecryptTime::=%
 
 ECHO Disc Decryption Complete >>!logFile!
 IF !StartDecryptTime! GTR !EndDecryptTime! (
@@ -518,6 +547,9 @@ IF "%titleCount:~0,1%" == ":" (
 )
 CALL :writeLine "Found !titleCount! titles."
 
+REM If the title isn't found then this variable will be 
+REM Set to true and the first movie length title will be assumed to be
+REM the main title.
 SET takeFirstTitle=FALSE
 
 :analyzeTitles
@@ -628,7 +660,7 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 	    CALL :writeAndLog "Could not find title output name."
 	)	
 
-	REM Skip titles less than 30 seconds long ============================
+	REM Skip titles less than 28 seconds long ============================
 	CALL :writeLog "   Get title length"
    FIND "TINFO:%%A,9,0" !discInfoFile! >"!tempFile!"
 	IF !ERRORLEVEL! EQU 0 (
@@ -676,6 +708,10 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
             SET EpisodeLength=60
          )
 			FIND """1:0" "!tempFile!" >nul
+			IF !ERRORLEVEL! EQU 0 (
+            SET EpisodeLength=60
+         )
+		 	FIND """1:1" "!tempFile!" >nul
 			IF !ERRORLEVEL! EQU 0 (
             SET EpisodeLength=60
          )
@@ -900,9 +936,11 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 		)
    ) ELSE (
 		REM Don't add multiple 1.5 hour titles from a movie ====================================
-		ECHO    Detect multiple 1.5 hour titles from a movie >> !logFile!
+		ECHO    Detect multiple movie length titles >> !logFile!
 		SET foundTitle=FALSE
-	   IF "!currentTitleLength!" GEQ "1:25:00" (
+		SET "subLength=!currentTitleLength:~0,1!!currentTitleLength:~2,2!"
+		SET "minLength=!MinTitleLength:~0,1!!MinTitleLength:~2,2!"
+	    IF "!subLength!" GEQ "!minLength!" (
 		   SET foundTitle=TRUE
 			CALL :writeLog "Found movie length title"
 
@@ -913,17 +951,25 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 				REM Also can be used to select a particular edition of the film.
 				IF NOT "!userLength!"=="" (
 					
-					SET subLength=!currentTitleLength:~0,4!
+					SET "subLength=!currentTitleLength:~0,4!"
 					CALL :writeLog "   Checking for title length match !userLength!"
 					IF "!userLength!"=="!subLength!" (
 						CALL :writeLog "Found title that matched user length"
 						SET foundTitle=TRUE
-					) ELSE (
+					) ELSE (						
+						SET "secondsLength=!currentTitleLength:~5,2!"
+						
+						REM numbers starting with zero treated as octal
+						IF "!currentTitleLength:~2,1!"=="0" (
+						   SET "minutesLength=!currentTitleLength:~3,1!"
+						) ELSE (
+						   SET "minutesLength=!currentTitleLength:~2,2!"
+						)
 						REM round titles up to the next minute
-						SET secondsLength=!currentTitleLength:~5,2!
-						SET minutesLength=!currentTitleLength:~2,2!
-						SET /A minutesLength+=1
-						IF !minutesLength! == 60 (
+						IF !secondsLength! GTR 29 (
+							SET /A minutesLength+=1
+						)
+						IF !minutesLength! EQU 60 (
 							SET "minutesLength=00"
 						)
 						IF !minutesLength! LSS 10 (
@@ -1018,11 +1064,11 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 							REM replace full screen title if this one is longer
 							IF !currentTitleLength! GTR !mainTitleLength! (
 								CALL :writeAndLog "Choosing New Full Screen Title Due To Length."
-								SET foundMainTitle=MAYBE
-								SET mainTitleLength=!currentTitleLength!
-								SET mainAudioChannelCount=!audioChannelCount!
+								SET "foundMainTitle=MAYBE"
+								SET "mainTitleLength=!currentTitleLength!"
+								SET "mainAudioChannelCount=!audioChannelCount!"
 							) ELSE (
-								CALL :writeAndLog "   Skipping title %%A because it is over 1.5 hours."
+								CALL :writeAndLog "   Skipping title %%A because it is over !MinTitleLength!."
 								SET badTitle=%%A
 							)
 						)
@@ -1053,14 +1099,14 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 							IF !chapterCount! GTR 1 (
 								CALL :writeAndLog "Choosing New Main Title Due To Title Length."
 								SET foundMainTitle=TRUE
-								SET mainTitleLength=!currentTitleLength!
-								SET mainAudioChannelCount=!audioChannelCount!
+								SET "mainTitleLength=!currentTitleLength!"
+								SET "mainAudioChannelCount=!audioChannelCount!"
 							) ELSE (
 								CALL :writeAndLog "Skipping title %%A due to length and chapters."
 								SET badTitle=%%A
 							)
 						) ELSE (
-							CALL :writeAndLog "Skipping title %%A because it is over 1.5 hours long."
+							CALL :writeAndLog "Skipping title %%A because it is over !MinTitleLength! long."
 							SET badTitle=%%A
 						)
 					)
@@ -1309,7 +1355,7 @@ FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 		CALL :waiting 3
 		IF ERRORLEVEL 1       (
 			ECHO ERROR>>!statusFile!
-			goto :eof
+			GOTO :eof
 		)
 		CALL :waitingForMKV
 	)
@@ -1353,8 +1399,9 @@ CALL :waiting 1
 REM Converting titles ====================================================
 :converting
 
-SET plusTime=%TIME:~3,2%
-SET plusTime=%plusTime: =0%
+REM Get current time to ensure that filename is unique
+SET "plusTime=%TIME:~3,2%"
+SET "plusTime=%plusTime: =0%"
 
 SET index=!lastEpisodeCount!
 
@@ -1509,8 +1556,9 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 			SET /p outputVideoLength=<del.txt
 			
 			REM randomly Handbrake files are a little shorter?
-			REM maybe it is trimming black frames or audio is longer than video
-			SET /A outputVideoLength=!outputVideoLength! + 4000
+			REM Maybe it is trimming black frames or audio is longer than video
+			REM Add 8 seconds to allow for an acceptable margin
+			SET /A outputVideoLength=!outputVideoLength! + 8000
 			
 			IF !outputVideoLength! GEQ !videoLength! (
 				SET "videoIsConverted=TRUE"
@@ -1529,7 +1577,8 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 		REM Break films into main title and features for PLEX ==============
 		REM Move files to PLEX folders
 		IF !mediaType!==FILM (
-			IF !videoLength! LEQ 5000000 (
+		    SET "tempName=%%i"
+			IF NOT "!tempName:Extra=!" == "!tempName!" (
 				IF NOT EXIST "!convertPath!\Behind The Scenes" (
 					mkdir "!convertPath!\Behind The Scenes"
 				)
@@ -1590,6 +1639,8 @@ Echo
 ECHO 100 > !ripProgressFile!
 ECHO 0.0%% > !progressFile!
 timeout /t 5
+
+ECHO Done. >> !statusFile!
 
 GOTO :eof
 
