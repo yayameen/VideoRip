@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-SET "VideoRipVersion=1.3.3"
+SET "VideoRipVersion=1.4.0"
 SET "VideoRipName=VideoRip !VideoRipVersion!"
 
 IF "!workingDir!" == "" (
@@ -14,6 +14,29 @@ IF "!logFile!" == "" (
    SET "logFile=!workingDir!\conversionLog.txt"
 )
 
+:printVersion
+REM Erases previous log. Do not change these to write calls
+ECHO Starting !VideoRipName!
+ECHO Log file is !logFile!
+ECHO !VideoRipName! > !logFile!
+ECHO !VideoRipName! > !statusFile!
+ECHO Min Title Length is !MinTitleLength! > !logFile!
+
+
+IF "!MakeMKVDir!" == "" (
+   ECHO Set MakeMKVDir to change MakeMKV Installation directory> !logFile!
+   SET "MakeMKVDir=MakeMKV"
+)
+
+IF "!MakeMKVExe!" == "" (
+   SET "MakeMKVExe=makemkvcon64.exe"
+)
+
+IF "!UseMakeMKV32!" == "TRUE" (
+   ECHO Set UseMakeMKV32 to TRUE or FALSE to change MakeMKV Executable> !logFile!
+   SET "MakeMKVExe=makemkvcon.exe"
+)
+
 REM Set the minimum title length if it was not set externally
 SET "tempUserLength=!userLength!"
 SET "userHour=0"
@@ -22,6 +45,7 @@ IF "!MinTitleLength!" == "" (
    IF "!tempUserLength!" == "" (
       SET "MinTitleLength=1:20:00"
    ) ELSE (
+      ECHO Set MinTitleLength to control the shortest allowable title> !logFile!
       REM Ensure minimum title length is at least user title length
 	  SET "tempUserLength=%userLength:~-2%"
 	  SET "userHour=%userLength:~0,1%"
@@ -36,35 +60,39 @@ IF "!MinTitleLength!" == "" (
    )
 )
 
-:printVersion
-REM Erases previous log. Do not change these to write calls
-ECHO Starting !VideoRipName!
-ECHO Log file is !logFile!
-ECHO !VideoRipName! > !logFile!
-ECHO !VideoRipName! > !statusFile!
-ECHO Min Title Length is !MinTitleLength! > !logFile!
-
-
-
 IF "!tempVidDir!" == "" (
-   SET tempVidDir=G:\TEMP\
+   ECHO Set tempVidDir to control the temporary ripping directory> !logFile!
+   SET tempVidDir=%TEMP%\VideoRip\Rip
 )
 ECHO Temp Video Dir is !tempVidDir! >> !logFile!
+IF NOT EXIST "!tempVidDir!" (
+    mkdir "!tempVidDir!"
+)
+
 IF "!tempConvertDir!" == "" (
-   SET tempConvertDir=J:\TEMP\
+   ECHO Set tempConvertDir to control the temporary converting directory> !logFile!
+   ECHO It must be different from the ripping directory> !logFile!
+   SET tempConvertDir=%TEMP%\VideoRip\Convert
 )
 ECHO Temp Convert Dir is !tempConvertDir! >> !logFile!
+IF NOT EXIST "!tempConvertDir!" (
+    mkdir "!tempConvertDir!"
+)
+
 IF "!progressFile!" == "" (
-	SET progressFile=!tempConvertDir!progress.txt
+    SET progressFile=!tempConvertDir!progress.txt
 )
 IF "!TvFolder!" == "" (
-	SET "TvFolder=J:\Video\TV Shows\"
+    ECHO Set TvFolder to control the folder where series shows are saved> !logFile!
+    SET "TvFolder=J:\Video\TV Shows\"
 )
 IF "!FilmFolder!" == "" (
-	SET "FilmFolder=J:\Video\Film\"
+    ECHO Set FilmFolder to control the folder where movies are saved> !logFile!
+    SET "FilmFolder=J:\Video\Film\"
 )
 IF "!lang!" == "" (
-	SET "lang=eng"
+    ECHO Set lang to 3 letter code to control the preferred language> !logFile!
+    SET "lang=eng"
 )
 
 SET "ripProgressFile=ripProgress.txt"
@@ -75,11 +103,13 @@ ECHO: Temp File is !tempFile! >> !logFile!
 
 REM retain multiple video angles on movie
 IF "!keepAngles!" EQU "" (
+   ECHO Set keepAngles to TRUE to save all video angles> !logFile!
    SET keepAngles=FALSE
 )
 
 IF "!preset!" EQU "" (
    ECHO No preset specified >>!logFile!
+   ECHO Set preset to control settings> !logFile!
 ) ELSE (
    ECHO preset is !preset! >>!logFile!
 )
@@ -89,7 +119,8 @@ ECHO 0 > !ripProgressFile!
 
 REM initialize variables
 IF "!isBonusDisc!" == "" (
-	SET isBonusDisc=FALSE
+    ECHO Set isBonusDisc to TRUE if the disc only contains special features> !logFile!
+    SET isBonusDisc=FALSE
 )
 SET "lastTitleName=none"
 SET discInfoFile=discInfo.txt
@@ -102,13 +133,13 @@ SET seperator=_________________________________
 
 REM Cleanup last run
 IF EXIST "!discInfoFile!" (
-	del "!discInfoFile!"
+	del "!discInfoFile!" /q
 )
 IF EXIST "!volNameFile!" (
-	del "!volNameFile!"
+	del "!volNameFile!" /q
 )
 IF EXIST "!renameFile!" (
-	del "!renameFile!"
+	del "!renameFile!" /q
 )
 
 REM launch Tail to view progress
@@ -184,7 +215,7 @@ IF 1 == 2 (
 	dvdTitle\DvdInfo.exe %drive% 0 t -f -s > tmpFile
 	IF EXIST tmpFile (
 		SET /p vol= < tmpFile
-		del tmpFile
+		del tmpFile /q
 	)
 
 	SET volError=!vol:unexpected error=!
@@ -221,7 +252,7 @@ IF NOT EXIST !discInfoFile! (
 	IF NOT "!lastLine!"=="!drvVol!" (
 		SET "forceRip=TRUE"
 		ECHO !drvVol!> "!volNameFile!"
-		"%ProgramFiles(x86)%\MakeMKV\makemkvcon.exe" -r info disc:%discNum% > !discInfoFile!
+		"%ProgramFiles(x86)%\!MakeMKVDir!\!MakeMKVExe!" -r info disc:%discNum% > !discInfoFile!
 	)
 )
 
@@ -241,7 +272,7 @@ ECHO Decryption Took !DecryptTimeMins! Min >>!logFile!
 
 REM If decryption takes a long time, then rip the entire DVD in a single
 REM operation in order to decrease ripping duration.
-REM Not doing the same for Blu-ray because of the large size and possibility
+REM Not doing the same for Blu-ray because the large size and possibility
 REM of streams being included in multiple titles can cause the output to grow
 REM to 100s of GBs.
 SET DecryptAllTitles=FALSE
@@ -268,7 +299,8 @@ IF "!vol!" == "" (
 
 REM Formatting video filename ===========================================
 
-REM remove spaces and illegal chars
+REM Eemove spaces and illegal chars
+REM Warning - Apparently the unicode characters get treated the same as ASCII sometimes
 REM SET "vol=!vol:|=｜!"
 REM SET "vol=!vol:>=﹥!"
 REM SET "vol=!vol:<=﹤!"
@@ -323,7 +355,7 @@ CALL :waiting 2
 
 REM Use commanded media type if it exists ===============================
 IF EXIST "!tempFile!" (
-	del "!tempFile!"
+	del "!tempFile!" /q
 )
 SET mediaType 2>"!tempFile!"
 Findstr /I "not defined" "!tempFile!" >nul
@@ -908,9 +940,15 @@ FOR /l %%A IN (0, 1, !forLimit!) DO (
 				
 				REM Check number of audio languages ============================================
 				CALL :countLang %%A
+				
+				REM some DVDs only encode the language on the first video
+				IF !unknownAudioChannel! == TRUE (
+				   SET /A audioLangCount+=1
+				)
+				
 				IF !episodeLangCount! GTR !audioLangCount! (
-					SET IsBonus=TRUE
-					CALL :writeLog Assuming %%A "is bonus due to missing audio language"
+					   SET IsBonus=TRUE
+					   CALL :writeLog Assuming %%A "is bonus due to missing audio language"
 				)
 				
 				REM Check number of subtitle languages ============================================
@@ -1302,12 +1340,14 @@ CALL :waiting 3
 
 SET ripCount=0
 
-SET "MakeMKVDir=MakeMKV"
+
+
+REM If disc decryption takes a long time, then ripping all titles is faster than multiple decryptions
 IF !DecryptAllTitles!==TRUE (
 	ECHO: Ripping All Titles for speed >>!logFile!
 	md !tempVidDir!del
-	ECHO: "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all !tempVidDir!del >>!logFile!
-	START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all !tempVidDir!del
+	ECHO: "%ProgramFiles(x86)%\!MakeMKVDir!\!MakeMKVExe!" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all !tempVidDir!del >>!logFile!
+	START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\!MakeMKVExe!" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% all "!tempVidDir!del"
 		
 	CALL :waiting 3
 	IF ERRORLEVEL 1       (
@@ -1350,7 +1390,8 @@ FOR /f "UseBackQ delims=" %%i IN (titleList.txt) DO (
 	
 	REM Skip files already ripped	
 	IF !ripCount! GEQ !Filesx! (
-		START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\makemkvcon.exe" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% %%i !tempVidDir!
+		ECHO processing disc %discNum% title %%i >> !logFile!
+		START "" /MIN /BELOWNORMAL "%ProgramFiles(x86)%\!MakeMKVDir!\!MakeMKVExe!" -r --messages="!tempFile!" --progress=-same mkv disc:%discNum% %%i "!tempVidDir!"
 		
 		CALL :waiting 3
 		IF ERRORLEVEL 1       (
@@ -1558,15 +1599,15 @@ FOR /F "delims=|" %%i IN ('dir /b "!tempVidDir!*.mkv"') DO (
 			REM randomly Handbrake files are a little shorter?
 			REM Maybe it is trimming black frames or audio is longer than video
 			REM Add 8 seconds to allow for an acceptable margin
-			SET /A outputVideoLength=!outputVideoLength! + 8000
+			SET /A tempOutputVideoLength=!outputVideoLength! + 8000
 			
-			IF !outputVideoLength! GEQ !videoLength! (
+			IF !tempOutputVideoLength! GEQ !videoLength! (
 				SET "videoIsConverted=TRUE"
 				IF !convertSuccess!==TRUE (
 					SET "convertSuccess=TRUE"
 				)
 			) ELSE (
-				CALL :writeAndLog Converted video too short "!outputVideoLength!"
+				CALL :writeAndLog "Video too short " "!outputVideoLength!" " less than " "!videoLength!"
 			)
 		) ELSE (
 			CALL :writeAndLog Conversion FAILED______________
@@ -1659,7 +1700,7 @@ REM Check to see if analyzation is complete
 :waitingForMKVb
 
 REM detect if MakeMKV dies
-CALL :taskRunning makemkvcon.exe
+CALL :taskRunning !MakeMKVExe!
 IF !taskIsRunning! EQU FALSE (
 	ECHO Make MKV terminated>> !logFile!
 	GOTO :waitingForMKVbDone
@@ -1709,7 +1750,7 @@ CALL :logChar [
 
 REM Check to see if MKV finished
 :readMKVprogress
-CALL :taskRunning makemkvcon.exe
+CALL :taskRunning !MakeMKVExe!
 IF !taskIsRunning! EQU FALSE (
 	SET whileLoopDone=1
 	SET "currentProgress=66000"
@@ -1956,11 +1997,13 @@ REM countLang ##################################################################
 REM ########################################################################################
 REM Count Audio Languages in a title
 :countLang
-SET langCount=0
-SET audioLangCount=0
-SET subtitleLangCount=0
+SET "langCount=0"
+SET "audioLangCount=0"
+SET "subtitleLangCount=0"
 SET "langs="
-SET countLangSkip=1
+SET "countLangSkip=1"
+SET "audioChannelCount=0"
+SET "unknownAudioChannel=FALSE"
  REM Determine number of columns to skip
 
 REM Find audio stream numbers
@@ -1970,18 +2013,30 @@ ECHO UNK > langs.txt
 ECHO UNK > audioLangs.txt
 ECHO UNK > subtitleLangs.txt
 
+
 REM In each audio stream, get the language code
-FOR /L %%Q IN (1,1,50) DO (	
+FOR /L %%Q IN (1,1,99) DO (	
+    REM Stop when we run out of streams
+    FIND "SINFO:%1,%%Q," !discInfoFile! >nul
+	IF NOT !ERRORLEVEL! EQU 0 (
+	   GOTO :countLangDone
+	)
 	
 	REM Get the language code lines	
 	FIND "SINFO:%1,%%Q,14,0," !discInfoFile! >nul
 	IF !ERRORLEVEL! EQU 0 (
 	    SET "langFile=audio"
+		SET /A audioChannelCount+=1
 	) ELSE (
 		SET "langFile=subtitle"
 	)
 	SET "outLine2=FINDSTR "SINFO:%1,%%Q,3,0," !discInfoFile!"
+	
+	REM If a stream has no language, assume english.
+	REM Some TV disccs only put a language on the first title!
+	SET "tempCount=0"
 	FOR /F %%R in ('!outLine2!') DO (
+	    SET /A tempCount+=1
 		REM parse the language code from the line
 		SET "lang=%%R"
 		SET "lang=!lang:~-4,-1!
@@ -2004,9 +2059,15 @@ FOR /L %%Q IN (1,1,50) DO (
 			)
 		)
 	)
+	IF !tempCount! EQU 0 (
+	   SET "unknownAudioChannel=TRUE"
+	)
 )
+
+:countLangDone
 ECHO: Found !langCount! languages>> !logFile!
 ECHO: Found !audioLangCount! audio languages>> !logFile!
+ECHO: Found !audioChannelCount! audio channels>> !logFile!
 ECHO: Found !subtitleLangCount! subtitle languages>> !logFile!
 del langs.txt
 del audioLangs.txt
